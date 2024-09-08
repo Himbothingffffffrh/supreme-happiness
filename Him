@@ -1,0 +1,79 @@
+local isMonster = false
+
+local LastCharacterPosition, LastCameraPosition, MainCharacter, deathConnection
+
+local function switchCharacter(targetCharacter)
+	if not isnetworkowner(targetCharacter:FindFirstChildWhichIsA("Part")) then
+		warn("Not network owner")
+		return
+	end
+	
+	isMonster = not isMonster
+
+	if isMonster then
+		LastCharacterPosition = MainCharacter.HumanoidRootPart.CFrame
+		LastCameraPosition = workspace.CurrentCamera.CFrame
+
+		game:GetService("Players").LocalPlayer.Character = targetCharacter
+
+		task.wait(1)
+
+		local humanoid = targetCharacter:FindFirstChildWhichIsA("Humanoid")
+		
+		task.spawn(function()
+			while humanoid and isMonster do
+				humanoid.WalkToPart = nil
+				task.wait()
+			end
+		end)
+		
+		workspace.CurrentCamera.CameraSubject = humanoid
+
+		warn("Switched to targetCharacter: ", targetCharacter.Name)
+		warn("Camera subject set to: ", humanoid.Name)
+
+		humanoid.Died:Connect(function()
+			switchCharacter(MainCharacter)
+		end)
+	else
+		game:GetService("Players").LocalPlayer.Character = MainCharacter
+
+		task.wait(1)
+
+		workspace.CurrentCamera.CameraSubject = MainCharacter:FindFirstChildWhichIsA("Humanoid")
+
+		warn("Switched back to MainCharacter: ", MainCharacter.Name)
+		warn("Camera subject set to: ", MainCharacter.Humanoid.Name)
+	end
+end
+
+game:GetService("Players").LocalPlayer:GetMouse().Button1Down:Connect(function()
+	if isMonster then
+		return
+	end
+
+	if deathConnection then
+		deathConnection:Disconnect()
+		deathConnection = nil
+	end
+
+	MainCharacter = game:GetService("Players").LocalPlayer.Character
+	deathConnection = MainCharacter.Humanoid.Died:Connect(function()
+		switchCharacter(MainCharacter)
+	end)
+
+	local humanoid = MainCharacter:FindFirstChildWhichIsA("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then return end
+
+	local target = game:GetService("Players").LocalPlayer:GetMouse().Target
+	if target and target.Parent and target.Parent:FindFirstChildWhichIsA("Humanoid") and target.Parent:FindFirstChildWhichIsA("Humanoid").Health > 0 then
+		local targetCharacter = target.Parent
+		switchCharacter(targetCharacter)
+	end
+end)
+
+game:GetService("UserInputService").InputBegan:Connect(function(input, gP)
+	if input.KeyCode == Enum.KeyCode.Q and not gP and isMonster then
+		switchCharacter(MainCharacter)
+	end
+end)
